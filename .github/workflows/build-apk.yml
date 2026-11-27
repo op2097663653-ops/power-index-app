@@ -19,7 +19,7 @@ jobs:
           gradle-version: '8.7'
       - name: Download project
         run: |
-          curl -L -o android-webview.zip https://power-index-cn.netlify.app/android-webview.zip
+          curl -L -o android-webview.zip https://raw.githubusercontent.com/op2097663653-ops/power-index-app/main/android-webview.zip
           unzip -q android-webview.zip
       - name: Build APK
         run: gradle -p android-webview assembleRelease --no-daemon

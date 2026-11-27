@@ -1558,6 +1558,56 @@ h1 {
   color: var(--muted);
 }
 
+/* ---------- 过渡与交互动画 ---------- */
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+#app.tab-enter { animation: screenIn .3s cubic-bezier(.2, .7, .3, 1) both; }
+
+@keyframes sheetUp {
+  from { opacity: .55; transform: translateY(7%); }
+  to   { opacity: 1; transform: none; }
+}
+.sheet { animation: sheetUp .28s cubic-bezier(.2, .8, .2, 1) both; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.sheet-layer { animation: fadeIn .2s ease both; }
+
+.btn, .chip, .ccard-main, .pair-side, .recent-row, .work-item, .seg button, .tier-row, .slot, .detail-actions button {
+  transition: transform .12s ease, background-color .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+.btn:active, .chip:active, .ccard-main:active, .pair-side:active, .recent-row:active,
+.work-item:active, .seg button:active, .tier-row:active, .slot:active { transform: scale(.97); }
+.tabbar button:active { transform: scale(.92); }
+
+.tabbar button svg { transition: transform .18s ease; }
+.tabbar button.on svg { animation: tabPop .34s cubic-bezier(.2, .8, .3, 1.5); }
+@keyframes tabPop {
+  0% { transform: scale(.82); }
+  60% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+
+.card, .ccard, .stat, .info-card, .radar-card, .range-card {
+  transition: transform .18s ease, box-shadow .22s ease, background-color .2s ease;
+}
+
+.toast { animation: toastIn .22s ease both; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.radar-poly, .radar-dot { will-change: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
 body.sheet-open { overflow: hidden; }
 .avatar.failed::after { content: ''; display: block; width: 45%; height: 45%; border-radius: 50%; border: 2px solid currentColor; opacity: .35; }
 #nl-badge-frame, iframe[src*="netlify"], a[href*="netlify.com"][target="_blank"] { display: none !important; visibility: hidden !important; }
@@ -2374,7 +2424,7 @@ function radarSVG(series) {
   const ang = (i) => -Math.PI / 2 + (i * Math.PI * 2) / N;
   const pt = (i, r) => [cx + Math.cos(ang(i)) * r, cy + Math.sin(ang(i)) * r];
   const pts = (arr) => arr.map(([x, y]) => x.toFixed(1) + ',' + y.toFixed(1)).join(' ');
-  let svg = `<svg viewBox="0 0 ${size} ${size}" width="100%" style="max-width:290px;display:block;margin:0 auto;overflow:visible">`;
+  let svg = `<svg class="radar-svg" data-radar viewBox="0 0 ${size} ${size}" width="100%" style="max-width:290px;display:block;margin:0 auto;overflow:visible">`;
   [0.25, 0.5, 0.75, 1].forEach((f) => {
     svg += `<polygon points="${pts(Array.from({ length: N }, (_, i) => pt(i, R * f)))}" fill="none" stroke="var(--line)"/>`;
   });
@@ -2382,11 +2432,14 @@ function radarSVG(series) {
     const [x, y] = pt(i, R);
     svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)"/>`;
   }
-  series.forEach((sr) => {
-    svg += `<polygon points="${pts(sr.order.map((g, i) => pt(i, (g / 8) * R)))}" fill="${sr.color}" fill-opacity="0.16" stroke="${sr.color}" stroke-width="2"/>`;
+  series.forEach((sr, si) => {
+    const prev = (window.__radarPrev && window.__radarPrev[si] && window.__radarPrev[si].length === N) ? window.__radarPrev[si] : null;
+    const init = prev || Array.from({ length: N }, () => 0);
+    const initPts = init.map((g, i) => pt(i, (g / 8) * R).map((n) => n.toFixed(1)).join(',')).join(' ');
+    svg += `<polygon class="radar-poly" data-series="${si}" data-order="${sr.order.join(',')}" points="${initPts}" fill="${sr.color}" fill-opacity="0.16" stroke="${sr.color}" stroke-width="2"/>`;
     sr.order.forEach((g, i) => {
-      const [x, y] = pt(i, (g / 8) * R);
-      svg += `<circle cx="${x}" cy="${y}" r="2.4" fill="${sr.color}"/>`;
+      const [x, y] = pt(i, (init[i] / 8) * R);
+      svg += `<circle class="radar-dot" data-series="${si}" data-axis="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4" fill="${sr.color}" opacity="${prev ? 1 : 0}"/>`;
     });
   });
   for (let i = 0; i < N; i++) {
@@ -2398,6 +2451,44 @@ function radarSVG(series) {
   }
   svg += '</svg>';
   return svg;
+}
+
+/* 雷达图形态过渡：从上一组数据平滑过渡到新数据 */
+window.__radarPrev = window.__radarPrev || {};
+function animateRadars() {
+  const cx = 125, cy = 125, R = 91;
+  const pt = (i, g) => {
+    const a = -Math.PI / 2 + (i * Math.PI * 2) / 6;
+    const r = (g / 8) * R;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+  };
+  document.querySelectorAll('[data-radar]').forEach((svg) => {
+    const polys = [...svg.querySelectorAll('.radar-poly')];
+    const groups = polys.map((poly, si) => {
+      const order = poly.dataset.order.split(',').map(Number);
+      const prev = (window.__radarPrev[si] && window.__radarPrev[si].length === 6) ? window.__radarPrev[si] : [0, 0, 0, 0, 0, 0];
+      window.__radarPrev[si] = order;
+      const dots = [...svg.querySelectorAll(`.radar-dot[data-series="${si}"]`)];
+      return { poly, order, start: prev, dots };
+    });
+    const t0 = performance.now(), dur = 520;
+    const tick = (now) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      groups.forEach(({ poly, order, start, dots }) => {
+        const vals = order.map((v, i) => start[i] + (v - start[i]) * e);
+        poly.setAttribute('points', vals.map((g, i) => pt(i, g).map((n) => n.toFixed(1)).join(',')).join(' '));
+        dots.forEach((dot, i) => {
+          const [x, y] = pt(i, vals[i]);
+          dot.setAttribute('cx', x.toFixed(1));
+          dot.setAttribute('cy', y.toFixed(1));
+          dot.setAttribute('opacity', String(Math.min(1, e * 1.4)));
+        });
+      });
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
 }
 
 /* ---------- 弹层 ---------- */
@@ -2552,10 +2643,19 @@ function slotbar() {
 function render() {
   const screens = { roster: rosterScreen, compare: compareScreen, tiers: tiersScreen, method: methodScreen };
   const app = document.getElementById('app');
+  const tabChanged = window.__lastTab !== state.tab;
+  window.__lastTab = state.tab;
   app.innerHTML = screens[state.tab]() + tabbar() + slotbar() + detailSheet() + filterSheet() + tierSheet()
     + (state.toast ? `<div class="toast" role="status">${esc(state.toast)}</div>` : '');
-  document.body.classList.toggle('sheet-open', !!(state.detail || state.filterOpen || state.tierSheet));
+  document.body.classList.toggle('sheet-open', !!(state.detail || state.filterOpen || state.tierSheet || state.slotsSheet));
+  if (tabChanged) {
+    window.__radarPrev = {};
+    app.classList.remove('tab-enter');
+    void app.offsetWidth;
+    app.classList.add('tab-enter');
+  }
   attachInputs();
+  animateRadars();
 }
 
 function attachInputs() {

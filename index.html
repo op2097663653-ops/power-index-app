@@ -1560,8 +1560,8 @@ h1 {
 
 /* ---------- 过渡与交互动画 ---------- */
 @keyframes screenIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 #app.tab-enter { animation: screenIn .3s cubic-bezier(.2, .7, .3, 1) both; }
 
@@ -1607,6 +1607,13 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- 系统栏安全区（由 App 通过 JS 注入像素值） ---------- */
+:root { --inset-top: 0px; --inset-bottom: 0px; }
+body { padding-top: var(--inset-top); }
+.tabbar { bottom: var(--inset-bottom); }
+.toast { bottom: calc(132px + var(--inset-bottom)); }
+.page { padding-bottom: calc(130px + var(--inset-bottom)); }
 
 body.sheet-open { overflow: hidden; }
 .avatar.failed::after { content: ''; display: block; width: 45%; height: 45%; border-radius: 50%; border: 2px solid currentColor; opacity: .35; }
@@ -2868,6 +2875,13 @@ function fallbackCopy(text, done) {
 
 /* 启动 */
 render();
+
+
+/* App 注入系统栏高度，避免内容被状态栏/导航条遮挡 */
+window.__applyInsets = function (top, bottom) {
+  document.documentElement.style.setProperty('--inset-top', (Number(top) || 0) + 'px');
+  document.documentElement.style.setProperty('--inset-bottom', (Number(bottom) || 0) + 'px');
+};
 
 </script>
 <script>

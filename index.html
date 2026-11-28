@@ -2408,6 +2408,10 @@ function methodScreen() {
     <p><b>角色头像</b>来自公开网络图片，版权归原作者与版权方所有，仅用于个人学习与对照参考。</p>
     <p>部分角色档位参照百度贴吧「汪峰在吧」战力表（2024 版）修正，如唐三、萧炎、罗峰、埼玉、星空饿狼、波罗斯、诺亚、齐天大圣、钟离、承太郎、鹿目圆、比尔·赛弗、元始天尊等。</p>
     <p>正式引用请补上原作位置（章节、页码或时间码）与体系版本。</p></div>`)}
+  <div class="card"><div class="card-title">分享</div>
+    <div class="card-hint">把这个网页发给朋友，对方在手机浏览器里就能打开；装了 App 的话会自动加载最新内容。</div>
+    <button type="button" class="btn block" data-action="share-site">分享给朋友</button>
+    <button type="button" class="btn ghost block" style="margin-top:8px" data-action="copy-site">复制链接</button></div>
   <p class="footer-note">本网页只作查阅与对比，不宣称获得任何机构或社区认证。</p>`;
 }
 
@@ -2814,6 +2818,24 @@ document.addEventListener('click', (e) => {
       if (!state.a || !state.b) break;
       const text = buildTemplate(state.a, state.b, analyze(state.a, state.b));
       copyText(text);
+      break;
+    }
+    case 'share-site': {
+      const url = location.origin + location.pathname;
+      if (window.AndroidBridge && typeof window.AndroidBridge.share === 'function') {
+        window.AndroidBridge.share(url);
+        break;
+      }
+      if (navigator.share) {
+        navigator.share({ title: '战力图鉴', text: '跨界角色战力对比', url }).catch(() => { copyText(url); toast('链接已复制'); });
+        break;
+      }
+      copyText(url); toast('链接已复制');
+      break;
+    }
+    case 'copy-site': {
+      copyText(location.origin + location.pathname);
+      toast('链接已复制');
       break;
     }
     case 'share': {
